@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeadForge | Saved Leads</title>
+  <meta name="description" content="Saved property leads in LeadForge." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100..900&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="icon" type="image/x-icon" href="LeadForge.ico" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-wrap">
+      <img src="leadforge-mark.svg" class="brand-icon" alt="LeadForge icon" />
+      <div><div class="brand">Lead<span class="brand-emphasis">Forge</span></div><div class="tagline">SAVED LEADS</div></div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-nav-outline" href="about.html">Product Overview</a>
+      <a id="backToSearchLink" class="btn btn-dark" href="index.html">Search</a>
+      <a class="btn btn-outline" href="completed.html">Completed Leads</a>
+      <button id="savedExportBtn" class="btn btn-gold" type="button">Export Saved Leads</button>
+    </div>
+  </header>
+
+  <main class="app-shell saved-page-shell">
+    <section class="search-panel card saved-leads-header">
+      <div class="section-heading">
+        <div><h1>Saved Leads</h1><p class="saved-page-subtitle">Active leads you have saved appear here. Completed leads are kept separately.</p></div>
+        <div class="coverage-pill"><span id="savedLeadCount">0</span> SAVED</div>
+      </div>
+      <div class="saved-filter-grid">
+        <label><span>Search saved leads</span><input id="savedSearchInput" type="text" placeholder="Address, owner, parcel, city…" autocomplete="off" /></label>
+        <label><span>Contact status</span><select id="savedStatusFilter"><option value="">All statuses</option><option value="Not researched">Not researched</option><option value="Ready to contact">Ready to contact</option><option value="Called">Called</option><option value="Texted">Texted</option><option value="Emailed">Emailed</option><option value="Spoke with owner">Spoke with owner</option><option value="Follow up">Follow up</option><option value="Not interested">Not interested</option><option value="Bad contact info">Bad contact info</option></select></label>
+        <label><span>Priority</span><select id="savedPriorityFilter"><option value="">All priorities</option><option value="Hot">Hot</option><option value="High">High</option><option value="Normal">Normal</option><option value="Low">Low</option></select></label>
+        <label><span>Pipeline Stage</span><select id="savedPipelineFilter"><option value="">All stages</option><option>Unworked</option><option>Contacted</option><option>Appointment</option><option>Closed</option></select></label>
+      </div>
+    </section>
+
+    <section class="results-card card saved-results-card">
+      <div class="panel-header">
+        <div><p class="eyebrow">SAVED LEADS</p><h2>Your Leads</h2></div>
+        <div class="table-tools"><select id="savedSortBy" title="Sort saved leads"><option value="newest">Recently updated</option><option value="address">Address</option><option value="value-desc">Value: High to Low</option><option value="value-asc">Value: Low to High</option><option value="acres-desc">Size: Large to Small</option></select></div>
+      </div>
+      <div class="table-wrap saved-table-wrap">
+        <table>
+          <thead><tr><th>Address</th><th>Lead Type</th><th>Size / Years</th><th>Market Value</th><th>Owner</th><th>Email</th><th>Status</th><th>Priority</th><th>Pipeline</th><th>Follow-Up</th><th></th></tr></thead>
+          <tbody id="savedResultsBody"><tr class="empty-row"><td colspan="11">No saved leads yet.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+    <footer class="app-footer">LeadForge · v1.0 · Local-first real estate intelligence</footer>
+  </main>
+
+  <aside id="savedDetailDrawer" class="drawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close-saved-drawer></div>
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <div><p class="eyebrow">SAVED LEAD DETAILS</p><h2 id="savedDetailAddress">Saved Lead</h2></div>
+        <button class="icon-btn" data-close-saved-drawer aria-label="Close">×</button>
+      </div>
+      <div id="savedDetailContent" class="drawer-content"></div>
+    </div>
+  </aside>
+
+  <template id="savedDetailTemplate">
+    <div class="detail-actions">
+      <button id="removeSavedLeadBtn" class="btn btn-outline" type="button">Remove Saved Lead</button>
+      <a id="savedTadLink" class="btn btn-outline" target="_blank" rel="noopener">Open TAD</a>
+      <a id="savedGoogleLink" class="btn btn-outline" target="_blank" rel="noopener">Google Maps</a>
+    </div>
+
+    <div id="savedOwnerSection" class="detail-section owner-priority-section">
+      <h3>County record owner</h3>
+      <dl class="detail-grid owner-priority-grid">
+        <div class="wide"><dt>Owner</dt><dd><span id="sOwner"></span><a id="savedFastPeopleSearchBtn" class="owner-search-btn" href="#" target="_blank" rel="noopener noreferrer">Search FastPeopleSearch</a></dd></div>
+        <div class="wide"><dt>Mailing address</dt><dd id="sOwnerAddress"></dd></div>
+      </dl>
+    </div>
+
+    <div id="savedMapSection" class="detail-section map-detail-section"><div class="detail-section-heading"><div><h3>Property map</h3><p>Satellite view opens by default.</p></div></div><div id="savedDetailMap"></div></div>
+
+    <div id="savedOwnershipSection" class="detail-section" hidden>
+      <h3>Ownership</h3>
+      <dl class="detail-grid">
+        <div><dt>Years owned</dt><dd id="sYearsOwned"></dd></div>
+        <div><dt>Deed date</dt><dd id="sDeedDate"></dd></div>
+        <div><dt>Likely owner occupied</dt><dd id="sOwnerOccupied"></dd></div>
+        <div><dt>Lead type</dt><dd id="sLeadType"></dd></div>
+      </dl>
+    </div>
+
+    <div id="savedCommercialSection" class="detail-section" hidden>
+      <h3>Commercial status</h3>
+      <dl class="detail-grid">
+        <div><dt>For sale</dt><dd id="sForSale"></dd></div>
+        <div><dt>Last sold</dt><dd id="sLastSold"></dd></div>
+      </dl>
+    </div>
+
+    <div id="savedRedditSection" class="detail-section" hidden>
+      <h3>Community discussion lead</h3>
+      <dl class="detail-grid">
+        <div><dt>Source</dt><dd id="sRedditSubreddit"></dd></div>
+        <div><dt>DFW area</dt><dd id="sRedditArea"></dd></div>
+        <div><dt>Post date</dt><dd id="sRedditDate"></dd></div>
+        <div><dt>Age</dt><dd id="sRedditAge"></dd></div>
+        <div class="wide"><dt>Intent</dt><dd id="sRedditIntent"></dd></div>
+        <div class="wide"><dt>Post summary</dt><dd id="sRedditSnippet"></dd></div>
+      </dl>
+      <a id="sRedditLink" class="btn btn-gold" href="#" target="_blank" rel="noopener noreferrer">Open Reddit Post</a>
+    </div>
+
+    <div id="savedPropertySection" class="detail-section">
+      <h3>Property</h3>
+      <dl class="detail-grid">
+        <div><dt>Parcel / Account</dt><dd id="sAccount"></dd></div>
+        <div><dt>Property type</dt><dd id="sType"></dd></div>
+        <div><dt>Lot size</dt><dd id="sSize"></dd></div>
+        <div><dt>Market value</dt><dd id="sMarket"></dd></div>
+        <div><dt>Land value</dt><dd id="sLandValue"></dd></div>
+        <div><dt>Use code</dt><dd id="sUseCode"></dd></div>
+        <div><dt>Building area</dt><dd id="sBuildingArea"></dd></div>
+        <div><dt>Year built</dt><dd id="sYearBuilt"></dd></div>
+        <div><dt>Subdivision</dt><dd id="sSubdivision"></dd></div>
+        <div><dt>Block / Lot</dt><dd id="sBlockLot"></dd></div>
+        <div class="wide"><dt>Legal description</dt><dd id="sLegal"></dd></div>
+      </dl>
+    </div>
+
+    <div class="detail-section lead-editor">
+      <h3>Your owner/contact research</h3>
+      <div class="form-grid">
+        <label id="savedEmailField"><span>Email</span><input id="savedLeadEmail" type="email" placeholder="Enter email manually" /></label>
+        <label id="savedForSaleField"><span>For sale</span><select id="savedLeadForSale"><option value="Unknown" selected>Unknown</option><option value="No">No</option><option value="Yes">Yes</option></select></label>
+        <label><span>Contact status</span><select id="savedLeadStatus"><option value="Not researched">Not researched</option><option value="Ready to contact">Ready to contact</option><option value="Called">Called</option><option value="Texted">Texted</option><option value="Emailed">Emailed</option><option value="Spoke with owner">Spoke with owner</option><option value="Follow up">Follow up</option><option value="Not interested">Not interested</option><option value="Bad contact info">Bad contact info</option></select></label>
+        <label><span>Priority</span><select id="savedLeadPriority"><option value="Normal">Normal</option><option value="High">High</option><option value="Hot">Hot</option><option value="Low">Low</option></select></label>
+        <label><span>Pipeline Stage</span><select id="savedLeadPipeline"><option>Unworked</option><option>Contacted</option><option>Appointment</option><option>Closed</option><option>Completed</option></select></label>
+        <label><span>Follow-Up Date & Time</span><input id="savedLeadFollowUp" type="datetime-local" /></label>
+        <div class="wide quick-followups saved-quick-followups"><button type="button" data-saved-followup-days="1">Tomorrow</button><button type="button" data-saved-followup-days="3">3 Days</button><button type="button" data-saved-followup-days="7">1 Week</button><button type="button" data-saved-followup-days="14">2 Weeks</button><button type="button" data-saved-followup-days="30">30 Days</button><button type="button" data-saved-followup-clear>Clear</button></div>
+        <label class="wide"><span>Notes</span><textarea id="savedLeadNotes" rows="5" placeholder="Owner research, conversation notes, follow-up details, etc."></textarea></label>
+      </div>
+      <button id="saveSavedLeadBtn" class="btn btn-dark btn-large" type="button">Save Lead Information</button><span id="savedSaveConfirmation" class="save-confirmation"></span>
+    </div>
+  </template>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="storage-utils.js"></script>
+    <script src="saved.js"></script>
+</body>
+</html>

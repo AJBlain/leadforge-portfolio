@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeadForge | Completed Leads</title>
+  <meta name="description" content="Completed and archived leads in LeadForge." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100..900&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="LeadForge.ico" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-wrap">
+      <img src="leadforge-mark.svg" class="brand-icon" alt="LeadForge icon" />
+      <div><div class="brand">Lead<span class="brand-emphasis">Forge</span></div><div class="tagline">COMPLETED LEADS</div></div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-nav-outline" href="about.html">Product Overview</a>
+      <a class="btn btn-dark" href="index.html">Search</a>
+      <a class="btn btn-outline" href="saved.html">Saved Leads</a>
+      <button id="completedExportBtn" class="btn btn-gold" type="button">Export Completed</button>
+    </div>
+  </header>
+
+  <main class="app-shell saved-page-shell">
+    <section class="search-panel card saved-leads-header">
+      <div class="section-heading">
+        <div><h1>Completed Leads</h1><p class="saved-page-subtitle">Leads marked Completed are removed from active Saved Leads and kept here. Reactivating one returns it to Saved Leads as Unworked.</p></div>
+        <div class="coverage-pill"><span id="completedLeadCount">0</span> COMPLETED</div>
+      </div>
+      <div class="saved-filter-grid">
+        <label><span>Search completed leads</span><input id="completedSearchInput" type="text" placeholder="Address, owner, city, Reddit title…" autocomplete="off" /></label>
+        <label><span>Lead type</span><select id="completedTypeFilter"><option value="">All types</option><option>Vacant Lot</option><option>Commercial Property</option><option>Vacant Commercial Building Candidate</option><option>Vacant Commercial Candidate</option><option>Property Search</option><option>Long-Term Owner</option><option>DFW Relocation Post</option><option>BiggerPockets Investor Post</option><option>Facebook Lead</option><option>TheLayoff Community Lead</option><option>Fishbowl Community Lead</option></select></label>
+        <label><span>Sort</span><select id="completedSortBy"><option value="newest">Most recently completed</option><option value="address">Address / Title</option><option value="value-desc">Value: High to Low</option></select></label>
+      </div>
+    </section>
+
+    <section class="results-card card saved-results-card">
+      <div class="panel-header"><div><p class="eyebrow">ARCHIVE</p><h2>Completed / No Further Follow-Up</h2></div></div>
+      <div class="table-wrap saved-table-wrap">
+        <table>
+          <thead><tr><th>Address / Lead</th><th>Lead Type</th><th>Owner / Source</th><th>Value</th><th>Completed</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="completedResultsBody"><tr class="empty-row"><td colspan="7">No completed leads yet.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+    <footer class="app-footer">LeadForge · v1.0 · Local-first real estate intelligence</footer>
+  </main>
+
+  <script src="storage-utils.js"></script>
+  <script src="completed.js"></script>
+</body>
+</html>

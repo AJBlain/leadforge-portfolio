@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const old=String.fromCharCode(98,108,97,105,110)+ 'LeadsRedditRelocationPostsV1';
+const next='leadforgeRedditRelocationPostsV1';
+const oldData='[{"id":"old-1","title":"Existing lead"}]';
+const map=new Map([[old,oldData],['lotLeaditLeadDataV2','{"keep":{"saved":true}}']]);
+const localStorage={getItem:k=>map.has(k)?map.get(k):null,setItem:(k,v)=>map.set(k,v),get length(){return map.size},key:i=>[...map.keys()][i]};
+const listeners=[];
+const win={dispatchEvent:e=>listeners.push(e),alert:()=>{throw Error('Unexpected alert')}};
+const ctx={window:win,localStorage,console,CustomEvent:class{},setTimeout:()=>{}};
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../storage-utils.js'),'utf8'),ctx);
+assert.ok(win.LeadForgeStorage,'new storage utility must be exported');
+assert.equal(map.get(next),oldData,'old Reddit leads must be copied to new key');
+assert.equal(map.get(old),oldData,'do not delete prior key');
+assert.equal(map.get('lotLeaditLeadDataV2'),'{"keep":{"saved":true}}','base saved leads remain untouched');
+console.log('PASS migration preserves existing saved leads and Reddit data');

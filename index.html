@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeadForge | Prospecting</title>
+  <meta name="description" content="Property prospecting app using public parcel and appraisal data." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100..900&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="preconnect" href="https://tile.openstreetmap.org" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="icon" type="image/x-icon" href="LeadForge.ico" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-wrap">
+      <img src="leadforge-mark.svg" class="brand-icon" alt="LeadForge icon" />
+      <div>
+        <div class="brand">Lead<span class="brand-emphasis">Forge</span></div>
+        <div class="tagline">PROPERTY INTELLIGENCE WORKBENCH</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="btn btn-nav-outline" href="about.html">Product Overview</a>
+      <button id="settingsBtn" class="btn btn-nav-outline" type="button">Settings</button>
+      <a id="savedLeadsLink" class="btn btn-dark" href="saved.html" target="_blank" rel="opener">Saved Leads <span id="savedCount">0</span></a>
+      <a id="completedLeadsLink" class="btn btn-outline" href="completed.html" target="_blank" rel="opener">Completed <span id="completedCount">0</span></a>
+      <button id="exportBtn" class="btn btn-gold" type="button" disabled>Export CSV</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="product-intro" aria-label="LeadForge introduction">
+      <div>
+        <div class="product-intro-label"><span class="live-dot"></span> LEADFORGE / RELEASE 1.0</div>
+        <h1>From parcel data to <span>qualified opportunities.</span></h1>
+        <p>Research properties, prioritize prospects, and manage follow-ups in one focused real estate intelligence workbench.</p>
+      </div>
+      <div class="product-pills" aria-label="Key capabilities"><span>Public GIS records</span><span>Evidence-based scoring</span><span>Local-first pipeline</span></div>
+    </section>
+    <nav class="workspace-tabs" aria-label="Prospecting searches">
+      <button id="vacantTabBtn" class="workspace-tab active" type="button" data-workspace="vacant">Vacant Lot Search</button>
+      <button id="commercialTabBtn" class="workspace-tab" type="button" data-workspace="commercial">Commercial Search</button>
+      <button id="vacantCommercialTabBtn" class="workspace-tab" type="button" data-workspace="vacant-commercial">Vacant Commercial Properties</button>
+      <button id="propertyTabBtn" class="workspace-tab" type="button" data-workspace="property">Property Search</button>
+      <button id="ownerTabBtn" class="workspace-tab" type="button" data-workspace="owners">Long-Term Owner Search</button>
+      <button id="communityTabBtn" class="workspace-tab" type="button" data-workspace="community">Lead Machine</button>
+    </nav>
+
+    <section id="followUpDashboard" class="followup-dashboard card">
+      <div class="followup-dashboard-head">
+        <div><p class="eyebrow">SMART FOLLOW-UP</p><h2>Follow-Up Dashboard</h2></div>
+        <a class="btn btn-outline btn-compact" href="saved.html" target="_blank" rel="opener">Open Saved Leads</a>
+      </div>
+      <div class="followup-dashboard-grid">
+        <div class="followup-bucket overdue"><div class="followup-bucket-title"><span>Overdue</span><strong id="followUpOverdueCount">0</strong></div><div id="followUpOverdueList" class="followup-list"><span class="followup-empty">None</span></div></div>
+        <div class="followup-bucket today"><div class="followup-bucket-title"><span>Due Today</span><strong id="followUpTodayCount">0</strong></div><div id="followUpTodayList" class="followup-list"><span class="followup-empty">None</span></div></div>
+        <div class="followup-bucket upcoming"><div class="followup-bucket-title"><span>Upcoming</span><strong id="followUpUpcomingCount">0</strong></div><div id="followUpUpcomingList" class="followup-list"><span class="followup-empty">None</span></div></div>
+      </div>
+    </section>
+
+    <section id="vacantWorkspace" class="workspace-panel active">
+      <section class="search-panel card">
+        <div class="section-heading">
+          <div><h1 class="dead-kansas-heading">Vacant Lot Search</h1></div>
+        </div>
+
+        <div class="search-grid">
+          <label>
+            <span>Search by</span>
+            <select id="searchMode">
+              <option value="zip">ZIP Code</option>
+              <option value="city">City</option>
+              <option value="county">County</option>
+            </select>
+          </label>
+
+          <label class="location-field">
+            <span id="locationLabel">ZIP Code</span>
+            <input id="locationInput" type="text" placeholder="" autocomplete="off" value="" />
+          </label>
+
+          <label>
+            <span>Lot type</span>
+            <select id="lotType">
+              <option value="both">Residential + Commercial</option>
+              <option value="residential" selected>Residential</option>
+              <option value="commercial">Commercial</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Minimum acres</span>
+            <input id="minAcres" type="number" min="0" step="0.01" placeholder="Any" />
+          </label>
+
+          <label>
+            <span>Maximum acres</span>
+            <input id="maxAcres" type="number" min="0" step="0.01" placeholder="Any" />
+          </label>
+
+          <label>
+            <span>Maximum market value</span>
+            <input id="maxValue" type="number" min="0" step="1000" placeholder="Any" />
+          </label>
+        </div>
+
+        <div class="internal-filter-controls" hidden aria-hidden="true">
+          <input id="excludeBuilt" type="checkbox" checked />
+          <input id="neighborhoodOnly" type="checkbox" checked />
+          <input id="excludeNonBuildable" type="checkbox" checked />
+          <input id="hideGovernment" type="checkbox" checked />
+        </div>
+
+        <div class="search-actions">
+          <button id="searchBtn" class="btn btn-gold btn-large" type="button">Search</button>
+          <button id="vacantMapSearchBtn" class="btn btn-outline btn-large" type="button">Map Search</button>
+          <button id="clearBtn" class="btn btn-outline btn-large" type="button">Clear</button>
+          <div id="statusText" class="status-text" hidden aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        <div class="stat card"><span>Shown</span><strong id="statCount">0</strong></div>
+      </section>
+
+      <section class="results-card card">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">SEARCH RESULTS</p>
+            <h2>Vacant Lots Found</h2>
+          </div>
+          <div class="table-tools">
+            <label class="sort-control"><span>Pipeline</span><select id="vacantPipelineFilter"><option value="">All stages</option><option>Unworked</option><option>Contacted</option><option>Appointment</option><option>Closed</option><option>Completed</option></select></label>
+            <label class="sort-control">
+              <span>Sort By</span>
+              <select id="sortBy" title="Sort results">
+                <option value="value-asc">Value: Low to High</option>
+                <option value="value-desc" selected>Value: High to Low</option>
+                <option value="acres-desc">Size: Large to Small</option>
+                <option value="acres-asc">Size: Small to Large</option>
+                <option value="address">Address</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Address</th>
+                <th>Type</th>
+                <th title="Uses the county deed/transfer date when available.">Last Sold</th>
+                <th>Size</th>
+                <th>Market Value</th>
+                <th>Owner</th>
+                <th>For Sale</th>
+                <th>Status</th>
+                <th>Pipeline</th>
+                <th>Next Best Action</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody">
+              <tr class="empty-row"><td colspan="11">Run a search to find vacant lots.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="commercialWorkspace" class="workspace-panel" hidden>
+      <section class="search-panel card">
+        <div class="section-heading">
+          <div>
+            <h1 class="dead-kansas-heading">Commercial Search</h1>
+            <p class="workspace-subtitle">Search commercial property records without limiting the results to properties actively listed for sale.</p>
+          </div>
+        </div>
+
+        <div class="commercial-search-grid">
+          <label>
+            <span>Search by</span>
+            <select id="commercialSearchMode">
+              <option value="zip">ZIP Code</option>
+              <option value="city">City</option>
+              <option value="subdivision">Subdivision</option>
+            </select>
+          </label>
+          <label>
+            <span id="commercialLocationLabel">ZIP Code</span>
+            <input id="commercialLocationInput" type="text" placeholder="" autocomplete="off" />
+          </label>
+          <label>
+            <span>Property type</span>
+            <select id="commercialType">
+              <option value="all" selected>All Commercial</option>
+              <option value="commercial">Commercial</option>
+              <option value="industrial">Industrial</option>
+              <option value="land">Commercial Land</option>
+              <option value="multifamily">Multifamily</option>
+            </select>
+          </label>
+          <label>
+            <span>Maximum market value</span>
+            <input id="commercialMaxValue" type="number" min="0" step="1000" placeholder="Any" />
+          </label>
+          <label>
+            <span>For Sale</span>
+            <select id="commercialForSaleFilter">
+              <option value="all" selected>All</option>
+              <option value="Yes">For Sale</option>
+              <option value="No">Not For Sale</option>
+              <option value="Unknown">Unknown</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="search-actions">
+          <button id="commercialSearchBtn" class="btn btn-gold btn-large" type="button">Search</button>
+          <button id="commercialMapSearchBtn" class="btn btn-outline btn-large" type="button">Map Search</button>
+          <button id="commercialClearBtn" class="btn btn-outline btn-large" type="button">Clear</button>
+          <div id="commercialStatusText" class="status-text" hidden aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="stats-grid stats-grid-single">
+        <div class="stat card"><span>Shown</span><strong id="commercialStatCount">0</strong></div>
+      </section>
+
+      <section class="results-card card">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">SEARCH RESULTS</p>
+            <h2>Commercial Properties Found</h2>
+          </div>
+          <div class="table-tools">
+            <button id="excludedCommercialOwnersBtn" class="btn btn-outline btn-compact" type="button">Excluded Owners</button>
+            <label class="sort-control"><span>Pipeline</span><select id="commercialPipelineFilter"><option value="">All stages</option><option>Unworked</option><option>Contacted</option><option>Appointment</option><option>Closed</option><option>Completed</option></select></label>
+            <label class="sort-control">
+              <span>Sort By</span>
+              <select id="commercialSortBy" title="Sort commercial properties">
+                <option value="value-desc" selected>Value: High to Low</option>
+                <option value="value-asc">Value: Low to High</option>
+                <option value="building-desc">Building: Large to Small</option>
+                <option value="acres-desc">Land: Large to Small</option>
+                <option value="address">Address</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Address</th>
+                <th>Type</th>
+                <th>Building</th>
+                <th>Market Value</th>
+                <th title="Manual listing status. Unknown is preserved until verified or changed manually.">For Sale</th>
+                <th title="Uses the county deed/transfer date when available.">Last Sold</th>
+                <th>Owner</th>
+                <th>Status</th>
+                <th>Pipeline</th>
+                <th>Next Best Action</th>
+              </tr>
+            </thead>
+            <tbody id="commercialResultsBody">
+              <tr class="empty-row"><td colspan="11">Run a search to find commercial properties.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="vacantCommercialWorkspace" class="workspace-panel" hidden>
+      <section class="search-panel card">
+        <div class="section-heading">
+          <div>
+            <h1 class="dead-kansas-heading">Vacant Commercial Properties</h1>
+            <p class="workspace-subtitle">Identify improved commercial properties with public-record signals that may suggest vacancy or repositioning. The Vacancy Signal Score is a heuristic prospecting estimate, not verified occupancy.</p>
+          </div>
+        </div>
+        <div class="vacant-commercial-filter-grid">
+          <label><span>ZIP</span><input id="vcZip" type="text" maxlength="5" placeholder="Any" list="vcZipOptions" /></label>
+          <label><span>City</span><input id="vcCity" type="text" placeholder="Any" list="vcCityOptions" /></label>
+          <label><span>County</span><select id="vcCounty"><option value="">Any</option><option value="Tarrant">Tarrant</option></select></label>
+          <label><span>Neighborhood / Submarket</span><input id="vcNeighborhood" type="text" placeholder="Any" list="vcNeighborhoodOptions" /></label>
+          <label><span>Radius Center ZIP / Address</span><input id="vcRadiusCenter" type="text" placeholder="Optional" /></label>
+          <label><span>Radius</span><select id="vcRadius"><option value="">None</option><option value="1">1 mile</option><option value="3">3 miles</option><option value="5">5 miles</option><option value="10">10 miles</option><option value="15">15 miles</option></select></label>
+          <label><span>Corridor / Major Road</span><input id="vcCorridor" type="text" placeholder="Any" list="vcCorridorOptions" /></label>
+          <label><span>Property Type</span><select id="vcType"><option value="all">All Commercial</option><option value="Commercial">Commercial</option><option value="Industrial">Industrial</option><option value="Commercial Land">Commercial Land</option><option value="Multifamily">Multifamily</option></select></label>
+          <label><span>Building Size</span><select id="vcBuildingSize"><option value="all">Any</option><option value="0-2500">0–2,500 sf</option><option value="2500-5000">2,500–5,000 sf</option><option value="5000-10000">5,000–10,000 sf</option><option value="10000-25000">10,000–25,000 sf</option><option value="25000+">25,000+ sf</option></select></label>
+          <label><span>Lot Size</span><select id="vcLotSize"><option value="all">Any</option><option value="0-0.25">Under 0.25 ac</option><option value="0.25-1">0.25–1 ac</option><option value="1-5">1–5 ac</option><option value="5+">5+ ac</option></select></label>
+          <label><span>Estimated Value</span><select id="vcValueRange"><option value="all">Any</option><option value="0-250000">Under $250k</option><option value="250000-500000">$250k–$500k</option><option value="500000-1000000">$500k–$1M</option><option value="1000000-2500000">$1M–$2.5M</option><option value="2500000+">$2.5M+</option></select></label>
+          <label><span>Owner Type</span><select id="vcOwnerType"><option value="all">Any</option><option value="individual">Individual</option><option value="local-entity">Local LLC / Business</option><option value="institutional">Institutional / Large Entity</option></select></label>
+          <label><span>Length of Ownership</span><select id="vcOwnership"><option value="all">Any</option><option value="5">5+ years</option><option value="10">10+ years</option><option value="15">15+ years</option><option value="20">20+ years</option></select></label>
+          <label><span>Last Sale Date</span><select id="vcLastSale"><option value="all">Any</option><option value="5">5+ years ago</option><option value="10">10+ years ago</option><option value="15">15+ years ago</option><option value="20">20+ years ago</option></select></label>
+          <label><span>Vacancy Signal Score (Estimate)</span><select id="vcConfidence"><option value="0">Any</option><option value="40">40+</option><option value="60">60+</option><option value="75">75+</option><option value="90">90+</option></select></label>
+        </div>
+        <datalist id="vcZipOptions"><option value="76179"><option value="76177"><option value="76137"><option value="76131"><option value="76148"><option value="76180"><option value="76052"></datalist>
+        <datalist id="vcCityOptions"><option value="Fort Worth"><option value="Saginaw"><option value="Watauga"><option value="North Richland Hills"><option value="Haslet"><option value="Keller"></datalist>
+        <datalist id="vcNeighborhoodOptions"><option value="Alliance"><option value="Fossil Creek"><option value="Stockyards"><option value="Near Southside"><option value="Downtown Fort Worth"></datalist>
+        <datalist id="vcCorridorOptions"><option value="Watauga Rd"><option value="Saginaw Blvd"><option value="Boat Club Rd"><option value="Hwy 377"><option value="I-35W"><option value="Loop 820"></datalist>
+        <div class="search-actions">
+          <button id="vcSearchBtn" class="btn btn-gold btn-large" type="button">Search</button>
+          <button id="vcClearBtn" class="btn btn-outline btn-large" type="button">Clear</button>
+          <div id="vcStatusText" class="status-text" hidden aria-live="polite"></div>
+        </div>
+      </section>
+      <section class="stats-grid stats-grid-single"><div class="stat card"><span>Shown</span><strong id="vcStatCount">0</strong></div></section>
+      <section class="results-card card">
+        <div class="panel-header"><div><p class="eyebrow">SEARCH RESULTS</p><h2>Vacant Commercial Buildings</h2></div><div class="table-tools"><label class="sort-control"><span>Pipeline</span><select id="vcPipelineFilter"><option value="">All stages</option><option>Unworked</option><option>Contacted</option><option>Appointment</option><option>Closed</option><option>Completed</option></select></label><label class="sort-control"><span>Sort By</span><select id="vcSortBy"><option value="confidence-desc" selected>Confidence: High to Low</option><option value="value-desc">Value: High to Low</option><option value="ownership-desc">Ownership: Longest First</option><option value="address">Address</option></select></label></div></div>
+        <div class="table-wrap"><table><thead><tr><th></th><th>Address</th><th>Type</th><th>Owner</th><th>Value</th><th>Building SF</th><th>Year Built</th><th title="Heuristic prospecting estimate; not verified occupancy.">Vacancy Signal</th><th>Reason</th><th>Source</th><th>Pipeline</th><th>Next Best Action</th></tr></thead><tbody id="vcResultsBody"><tr class="empty-row"><td colspan="12">Set one or more location filters and run a search.</td></tr></tbody></table></div>
+      </section>
+    </section>
+
+    <section id="propertyWorkspace" class="workspace-panel" hidden>
+      <section class="search-panel card">
+        <div class="section-heading"><div><h1 class="dead-kansas-heading">Property Search</h1><p class="workspace-subtitle">Fast address-only prospecting lookup for residential, commercial, land, or other property types.</p></div></div>
+        <div class="property-search-grid">
+          <label class="wide"><span>Property Address</span><input id="propertyAddressInput" type="text" placeholder="Enter a full street address" autocomplete="off" /></label>
+        </div>
+        <div class="search-actions">
+          <button id="propertySearchBtn" class="btn btn-gold btn-large" type="button">Search</button>
+          <button id="propertyClearBtn" class="btn btn-outline btn-large" type="button">Clear</button>
+          <div id="propertyStatusText" class="status-text" hidden aria-live="polite"></div>
+        </div>
+      </section>
+      <section class="stats-grid stats-grid-single"><div class="stat card"><span>Found</span><strong id="propertyStatCount">0</strong></div></section>
+      <section class="results-card card">
+        <div class="panel-header"><div><p class="eyebrow">ADDRESS LOOKUP</p><h2>Property Result</h2></div><div class="table-tools"><label class="sort-control"><span>Pipeline</span><select id="propertyPipelineFilter"><option value="">All stages</option><option>Unworked</option><option>Contacted</option><option>Appointment</option><option>Closed</option><option>Completed</option></select></label></div></div>
+        <div class="table-wrap"><table><thead><tr><th></th><th>Address</th><th>Type</th><th>Owner</th><th>Value</th><th>Lead Quality</th><th>Pipeline</th><th>Next Best Action</th></tr></thead><tbody id="propertyResultsBody"><tr class="empty-row"><td colspan="8">Enter an address to look up a property.</td></tr></tbody></table></div>
+      </section>
+    </section>
+
+    <section id="ownerWorkspace" class="workspace-panel" hidden>
+      <section class="search-panel card">
+        <div class="section-heading">
+          <div>
+            <h1 class="dead-kansas-heading">Long-Term Owner Search</h1>
+            <p class="workspace-subtitle">Find residential owners by ZIP, city or subdivision using verified county deed dates.</p>
+          </div>
+        </div>
+
+        <div class="owner-search-grid owner-search-grid-v31">
+          <label>
+            <span>Search by</span>
+            <select id="ownerSearchMode">
+              <option value="zip">ZIP Code</option>
+              <option value="city">City</option>
+              <option value="subdivision">Subdivision</option>
+            </select>
+          </label>
+          <label>
+            <span id="ownerLocationLabel">ZIP Code</span>
+            <input id="ownerLocationInput" type="text" placeholder="" autocomplete="off" />
+          </label>
+          <label>
+            <span>Owned at least</span>
+            <select id="ownerYears">
+              <option value="5" selected>5+ years</option>
+              <option value="10">10+ years</option>
+              <option value="15">15+ years</option>
+              <option value="20">20+ years</option>
+            </select>
+          </label>
+          <label>
+            <span>Occupancy</span>
+            <select id="ownerOccupancy">
+              <option value="owner" selected>Likely Owner Occupied</option>
+              <option value="all">All Long-Term Owners</option>
+            </select>
+          </label>
+          <label>
+            <span>Maximum market value</span>
+            <input id="ownerMaxValue" type="number" min="0" step="1000" placeholder="Any" />
+          </label>
+        </div>
+
+        <div class="search-actions">
+          <button id="ownerSearchBtn" class="btn btn-gold btn-large" type="button">Search</button>
+          <button id="ownerMapSearchBtn" class="btn btn-outline btn-large" type="button">Map Search</button>
+          <button id="ownerClearBtn" class="btn btn-outline btn-large" type="button">Clear</button>
+          <div id="ownerStatusText" class="status-text" hidden aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="stats-grid stats-grid-single">
+        <div class="stat card"><span>Shown</span><strong id="ownerStatCount">0</strong></div>
+      </section>
+
+      <section class="results-card card">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">SEARCH RESULTS</p>
+            <h2>Long-Term Owners Found</h2>
+          </div>
+          <div class="table-tools">
+            <label class="sort-control"><span>Pipeline</span><select id="ownerPipelineFilter"><option value="">All stages</option><option>Unworked</option><option>Contacted</option><option>Appointment</option><option>Closed</option><option>Completed</option></select></label>
+            <label class="sort-control">
+              <span>Sort By</span>
+              <select id="ownerSortBy" title="Sort long-term owners">
+                <option value="years-desc" selected>Years Owned: High to Low</option>
+                <option value="years-asc">Years Owned: Low to High</option>
+                <option value="value-desc">Value: High to Low</option>
+                <option value="value-asc">Value: Low to High</option>
+                <option value="address">Address</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Address</th>
+                <th>Years Owned</th>
+                <th>Deed Date</th>
+                <th>Market Value</th>
+                <th>Owner</th>
+                <th>Owner Occupied</th>
+                <th>Status</th>
+                <th>Pipeline</th>
+                <th>Next Best Action</th>
+              </tr>
+            </thead>
+            <tbody id="ownerResultsBody">
+              <tr class="empty-row"><td colspan="10">Run a search to find long-term residential owners.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="redditWorkspace" class="workspace-panel" hidden>
+      <section class="search-panel card reddit-compact-search">
+        <div class="section-heading">
+          <div><h1 class="dead-kansas-heading">Relocation Leads</h1></div>
+        </div>
+        <div class="reddit-region-controls">
+          <label for="redditBatchSelect"><strong>Region to research</strong></label>
+          <select id="redditBatchSelect" aria-label="Choose one of six DFW Reddit search regions"></select>
+          <p>Search one region at a time. Copy the prompt into ChatGPT, import its JSON, then move to the next region. Six batches cover all 99 cities; this does not automatically search Reddit.</p>
+        </div>
+        <div class="search-actions">
+          <button id="redditRunChatGPTBtn" class="btn btn-gold btn-large" type="button">Open ChatGPT Search</button>
+          <button id="redditCopyPromptBtn" class="btn btn-outline btn-large" type="button">Copy Prompt</button>
+          <button id="redditClearBtn" class="btn btn-outline btn-large" type="button">Clear</button>
+        </div>
+      </section>
+
+      <section class="card reddit-coverage-card" aria-label="Region coverage">
+        <div class="panel-header"><div><p class="eyebrow">SEARCH COVERAGE</p><h2>Six-region checklist</h2></div></div>
+        <p class="reddit-coverage-disclaimer">Counts come from imported ChatGPT research. “Search reported” is not independently verified. No region is marked searched merely because you copied a prompt.</p>
+        <div id="redditCoverageGrid" class="reddit-coverage-grid"></div>
+      </section>
+
+      <section id="redditImportCard" class="card reddit-import-card">
+        <div class="panel-header reddit-import-header">
+          <div><p class="eyebrow">CHATGPT RESULTS</p><h2>Import Relocation Posts</h2></div>
+          <button id="redditImportHideBtn" class="btn btn-outline btn-compact" type="button">Hide Import</button>
+        </div>
+        <div id="redditImportBody">
+          <p class="reddit-import-help">Run the selected region in ChatGPT, then paste its JSON here. Missing date evidence goes into the review queue rather than disappearing.</p>
+          <textarea id="redditImportText" class="reddit-import-text" rows="7" placeholder='Paste the JSON from ChatGPT here…'></textarea>
+          <div class="reddit-import-actions">
+            <button id="redditImportBtn" class="btn btn-dark" type="button">Import Results</button>
+          </div>
+          <p id="redditImportFeedback" class="reddit-import-feedback" role="status" aria-live="polite" hidden></p>
+          <details class="reddit-prompt-preview"><summary>View the exact ChatGPT search prompt</summary><pre id="redditPromptPreview"></pre></details>
+        </div>
+      </section>
+      <section id="redditImportCollapsed" class="card reddit-import-collapsed" hidden>
+        <div><p class="eyebrow">CHATGPT RESULTS</p><strong id="redditImportCollapsedSummary">Import panel hidden.</strong></div>
+        <button id="redditImportOpenBtn" class="btn btn-outline" type="button">Import More Posts</button>
+      </section>
+
+      <section class="stats-grid stats-grid-single">
+        <div class="stat card"><span>Verified, Unworked</span><strong id="redditStatCount">0</strong></div>
+        <div class="stat card"><span>Needs Date Verification</span><strong id="redditReviewCount">0</strong></div>
+        <div class="stat card"><span>Older / Archived</span><strong id="redditArchiveCount">0</strong></div>
+      </section>
+
+      <section class="results-card card">
+        <div class="panel-header">
+          <div><p class="eyebrow">SEARCH RESULTS</p><h2>Leads</h2></div>
+          <div class="table-tools">
+            <label class="sort-control"><span>Show</span><select id="redditStatusFilter" title="Filter Reddit leads by date status"><option value="verified" selected>Verified Recent</option><option value="needs-review">Needs Date Verification</option><option value="expired">Older / Archive</option><option value="all">All Imported</option></select></label>
+            <label class="sort-control"><span>Find</span><input id="redditFilterInput" type="search" placeholder="Title, city, subreddit…" aria-label="Filter Reddit lead results" /></label>
+            <button id="redditWorkedPostsBtn" class="btn btn-outline btn-compact" type="button">Worked Posts</button>
+            <label class="sort-control"><span>Sort By</span><select id="redditSortBy" title="Sort relocation posts"><option value="score-desc" selected>Opportunity Score: High to Low</option><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="area">DFW Area</option><option value="subreddit">Subreddit</option></select></label>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>Post</th><th>Subreddit</th><th>DFW Area</th><th>Post Date</th><th>Age</th><th>Intent</th><th>Opportunity</th><th>Next Best Action</th><th></th></tr></thead>
+            <tbody id="redditResultsBody"><tr class="empty-row"><td colspan="10">Run the ChatGPT search and import the results.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+
+    </section>
+
+    <section id="communityWorkspace" class="workspace-panel" hidden></section>
+
+    <footer class="app-footer">DFW Region · v1.0</footer>
+  </main>
+
+  <aside id="detailDrawer" class="drawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close-drawer></div>
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <div>
+          <p id="detailEyebrow" class="eyebrow">PARCEL / LEAD DETAILS</p>
+          <h2 id="detailAddress">Property</h2>
+        </div>
+        <button class="icon-btn" data-close-drawer aria-label="Close">×</button>
+      </div>
+      <div id="detailContent" class="drawer-content"></div>
+    </div>
+  </aside>
+
+  <div id="workflowModal" class="simple-modal" aria-hidden="true">
+    <div class="simple-modal-backdrop" data-close-workflow></div>
+    <div class="simple-modal-card workflow-card" role="dialog" aria-modal="true" aria-labelledby="workflowTitle">
+      <div class="simple-modal-header"><div><p class="eyebrow">LEAD PIPELINE</p><h2 id="workflowTitle">Manage Lead</h2><p id="workflowLeadLabel" class="simple-modal-help"></p></div><button class="simple-modal-close" type="button" data-close-workflow aria-label="Close">×</button></div>
+      <div class="workflow-grid">
+        <label><span>Pipeline Stage</span><select id="workflowStage"><option>Unworked</option><option>Contacted</option><option>Appointment</option><option>Closed</option><option>Completed</option></select></label>
+        <label><span>Follow-Up Date & Time</span><input id="workflowFollowUp" type="datetime-local" /></label>
+      </div>
+      <div class="quick-followups" aria-label="Quick follow-up options"><button type="button" data-followup-days="1">Tomorrow</button><button type="button" data-followup-days="3">3 Days</button><button type="button" data-followup-days="7">1 Week</button><button type="button" data-followup-days="14">2 Weeks</button><button type="button" data-followup-days="30">30 Days</button><button type="button" data-followup-custom>Custom</button></div>
+      <div class="simple-modal-footer"><button id="workflowClearFollowUp" class="btn btn-outline" type="button">Clear Follow-Up</button><button id="workflowSaveBtn" class="btn btn-dark" type="button">Save</button></div>
+    </div>
+  </div>
+
+
+  <div id="searchProgressModal" class="search-progress-modal" aria-hidden="true">
+    <div class="search-progress-card" role="dialog" aria-modal="true" aria-labelledby="searchProgressTitle">
+      <p class="eyebrow">SEARCH IN PROGRESS</p>
+      <h2 id="searchProgressTitle">Searching properties</h2>
+      <div class="search-progress-track"><div id="searchProgressBar" class="search-progress-bar"></div></div>
+      <div class="search-progress-meta">
+        <strong id="searchProgressPct">0%</strong>
+        <span id="searchProgressEta">Estimating time…</span>
+      </div>
+      <div id="searchProgressStep" class="search-progress-step">Starting search…</div>
+      <div id="searchProgressElapsed" class="search-progress-elapsed">0s elapsed</div>
+      <p class="search-progress-note">Time remaining is an estimate based on recent searches and adjusts while the search runs.</p>
+    </div>
+  </div>
+
+  <div id="excludedStreetsModal" class="simple-modal" aria-hidden="true">
+    <div class="simple-modal-backdrop" data-close-excluded-streets></div>
+    <div class="simple-modal-card" role="dialog" aria-modal="true" aria-labelledby="excludedStreetsTitle">
+      <div class="simple-modal-header">
+        <div><p class="eyebrow">MANUAL STREET SCRUB</p><h2 id="excludedStreetsTitle">Excluded streets</h2></div>
+        <button class="simple-modal-close" type="button" data-close-excluded-streets aria-label="Close">×</button>
+      </div>
+      <p class="simple-modal-help">Lots on these streets are hidden from normal vacant-lot search results. Restore a street anytime.</p>
+      <div id="excludedStreetsList" class="excluded-streets-list"></div>
+      <div class="simple-modal-footer">
+        <button id="clearExcludedStreetsBtn" class="btn btn-outline" type="button">Restore All Streets</button>
+        <button class="btn btn-dark" type="button" data-close-excluded-streets>Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="excludedCommercialOwnersModal" class="simple-modal" aria-hidden="true">
+    <div class="simple-modal-backdrop" data-close-excluded-commercial-owners></div>
+    <div class="simple-modal-card" role="dialog" aria-modal="true" aria-labelledby="excludedCommercialOwnersTitle">
+      <div class="simple-modal-header">
+        <div><p class="eyebrow">COMMERCIAL OWNER SCRUB</p><h2 id="excludedCommercialOwnersTitle">Excluded owners</h2></div>
+        <button class="simple-modal-close" type="button" data-close-excluded-commercial-owners aria-label="Close">×</button>
+      </div>
+      <div id="excludedCommercialOwnersList" class="excluded-streets-list"></div>
+      <div class="simple-modal-footer">
+        <button id="clearExcludedCommercialOwnersBtn" class="btn btn-outline" type="button">Restore All Owners</button>
+        <button class="btn btn-dark" type="button" data-close-excluded-commercial-owners>Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="redditWorkedPostsModal" class="simple-modal" aria-hidden="true">
+    <div class="simple-modal-backdrop" data-close-reddit-worked></div>
+    <div class="simple-modal-card" role="dialog" aria-modal="true" aria-labelledby="redditWorkedPostsTitle">
+      <div class="simple-modal-header">
+        <div><p class="eyebrow">RELOCATION LEADS</p><h2 id="redditWorkedPostsTitle">Worked Posts</h2></div>
+        <button class="simple-modal-close" type="button" data-close-reddit-worked aria-label="Close">×</button>
+      </div>
+      <p class="simple-modal-help">Posts marked Worked stay hidden from future imports until you restore them.</p>
+      <div id="redditWorkedPostsList" class="excluded-streets-list"></div>
+      <div class="simple-modal-footer">
+        <button id="restoreAllRedditWorkedBtn" class="btn btn-outline" type="button">Restore All</button>
+        <button class="btn btn-dark" type="button" data-close-reddit-worked>Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="redditDmModal" class="simple-modal" aria-hidden="true">
+    <div class="simple-modal-backdrop" data-close-reddit-dm></div>
+    <div class="simple-modal-card reddit-dm-card" role="dialog" aria-modal="true" aria-labelledby="redditDmTitle">
+      <div class="simple-modal-header">
+        <div><p class="eyebrow">RELOCATION LEAD</p><h2 id="redditDmTitle">Direct Message</h2></div>
+        <button class="simple-modal-close" type="button" data-close-reddit-dm aria-label="Close">×</button>
+      </div>
+      <p id="redditDmPostTitle" class="simple-modal-help"></p>
+      <textarea id="redditDmText" class="reddit-dm-text" rows="8" aria-label="Generated direct message"></textarea>
+      <div class="simple-modal-footer">
+        <button id="redditDmRegenerateBtn" class="btn btn-outline" type="button">Regenerate</button>
+        <button id="redditDmCopyBtn" class="btn btn-gold" type="button">Copy DM</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mapSearchModal" class="map-search-modal" aria-hidden="true">
+    <div class="map-search-shell" role="dialog" aria-modal="true" aria-labelledby="mapSearchTitle">
+      <div class="map-search-header">
+        <div><p class="eyebrow">DRAW SEARCH AREA</p><h2 id="mapSearchTitle">Map Search</h2></div>
+        <button id="mapSearchCloseBtn" class="icon-btn" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="map-search-map-wrap">
+        <div class="map-search-basemap-toggle" role="group" aria-label="Map style">
+          <button id="mapSearchStreetBtn" class="map-search-basemap-btn active" type="button">Map</button>
+          <button id="mapSearchSatelliteBtn" class="map-search-basemap-btn" type="button">Satellite</button>
+        </div>
+        <div id="mapSearchMap" class="map-search-map"></div>
+      </div>
+      <div class="map-search-footer">
+        <div id="mapSearchHint" class="map-search-hint">Click the map to place boundary points. Use at least 3 points.</div>
+        <div class="map-search-actions">
+          <button id="mapSearchUndoBtn" class="btn btn-outline" type="button">Undo Point</button>
+          <button id="mapSearchClearBtn" class="btn btn-outline" type="button">Clear Boundary</button>
+          <button id="mapSearchRunBtn" class="btn btn-gold" type="button" disabled>Search This Area</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <template id="detailTemplate">
+    <div class="detail-actions">
+      <button id="detailSaveLead" class="btn btn-gold" type="button">Save Lead</button>
+      <button id="detailExcludeStreet" class="btn btn-outline street-exclude-detail" type="button">Exclude Street</button>
+      <a id="detailTadLink" class="btn btn-outline" target="_blank" rel="noopener">Open TAD</a>
+      <a id="detailGoogleLink" class="btn btn-outline" target="_blank" rel="noopener">Google Maps</a>
+      <a id="vacantListingSearchLink" class="btn btn-outline" target="_blank" rel="noopener">Check Listings</a>
+    </div>
+
+    <div class="detail-section owner-priority-section">
+      <h3>County record owner</h3>
+      <dl class="detail-grid owner-priority-grid">
+        <div class="wide"><dt>Owner</dt><dd><span id="dOwner"></span><a id="fastPeopleSearchBtn" class="owner-search-btn" href="#" target="_blank" rel="noopener noreferrer">Search FastPeopleSearch</a></dd></div>
+        <div class="wide"><dt>Mailing address</dt><dd id="dOwnerAddress"></dd></div>
+      </dl>
+    </div>
+
+    <div class="detail-section map-detail-section">
+      <div class="detail-section-heading"><div><h3>Parcel map</h3><p>Selected parcel location.</p></div></div>
+      <div id="detailMap"></div>
+    </div>
+
+    <div class="detail-section">
+      <h3>Property</h3>
+      <dl class="detail-grid">
+        <div><dt>Parcel / Account</dt><dd id="dAccount"></dd></div>
+        <div><dt>Lot type</dt><dd id="dType"></dd></div>
+        <div><dt>Last sold</dt><dd id="dLastSold"></dd></div>
+        <div><dt>Lot size</dt><dd id="dSize"></dd></div>
+        <div><dt>Market value</dt><dd id="dMarket"></dd></div>
+        <div><dt>Land value</dt><dd id="dLandValue"></dd></div>
+        <div><dt>Use code</dt><dd id="dUseCode"></dd></div>
+        <div><dt>Subdivision</dt><dd id="dSubdivision"></dd></div>
+        <div><dt>Block / Lot</dt><dd id="dBlockLot"></dd></div>
+        <div class="wide"><dt>Legal description</dt><dd id="dLegal"></dd></div>
+      </dl>
+    </div>
+
+    <div class="detail-section lead-editor">
+      <h3>Your owner/contact research</h3>
+      <div class="form-grid">
+        <label><span>Email</span><input id="leadEmail" type="email" placeholder="Enter email manually" /></label>
+        <label><span>For sale</span><select id="vacantForSale"><option value="Unknown" selected>Unknown</option><option value="No">No</option><option value="Yes">Yes</option></select></label>
+        <label><span>Contact status</span>
+          <select id="leadStatus">
+            <option value="Not researched">Not researched</option><option value="Ready to contact">Ready to contact</option><option value="Called">Called</option><option value="Texted">Texted</option><option value="Emailed">Emailed</option><option value="Spoke with owner">Spoke with owner</option><option value="Follow up">Follow up</option><option value="Not interested">Not interested</option><option value="Bad contact info">Bad contact info</option>
+          </select>
+        </label>
+        <label><span>Priority</span><select id="leadPriority"><option value="Normal">Normal</option><option value="High">High</option><option value="Hot">Hot</option><option value="Low">Low</option></select></label>
+        <label class="wide"><span>Notes</span><textarea id="leadNotes" rows="5" placeholder="Owner research, conversation notes, follow-up date, etc."></textarea></label>
+      </div>
+      <button id="saveContactBtn" class="btn btn-dark btn-large" type="button">Save Lead Information</button>
+      <span id="saveConfirmation" class="save-confirmation"></span>
+    </div>
+  </template>
+
+  <template id="commercialDetailTemplate">
+    <div class="detail-actions">
+      <button id="commercialDetailSaveLead" class="btn btn-gold" type="button">Save Lead</button>
+      <button id="commercialDetailExcludeOwner" class="btn btn-outline" type="button">Exclude Owner</button>
+      <a id="commercialDetailTadLink" class="btn btn-outline" target="_blank" rel="noopener">Open TAD</a>
+      <a id="commercialDetailGoogleLink" class="btn btn-outline" target="_blank" rel="noopener">Google Maps</a>
+      <a id="commercialListingSearchLink" class="btn btn-outline" target="_blank" rel="noopener">Check Listings</a>
+    </div>
+
+    <div class="detail-section owner-priority-section">
+      <h3>County record owner</h3>
+      <dl class="detail-grid owner-priority-grid">
+        <div class="wide"><dt>Owner</dt><dd><span id="cOwner"></span><a id="commercialFastPeopleSearchBtn" class="owner-search-btn" href="#" target="_blank" rel="noopener noreferrer">Search FastPeopleSearch</a></dd></div>
+        <div class="wide"><dt>Mailing address</dt><dd id="cOwnerAddress"></dd></div>
+      </dl>
+    </div>
+
+    <div class="detail-section map-detail-section">
+      <div class="detail-section-heading"><div><h3>Property map</h3><p>Satellite view opens by default.</p></div></div>
+      <div id="detailMap"></div>
+    </div>
+
+    <div class="detail-section">
+      <h3>Commercial property</h3>
+      <dl class="detail-grid">
+        <div><dt>Parcel / Account</dt><dd id="cAccount"></dd></div>
+        <div><dt>Property type</dt><dd id="cType"></dd></div>
+        <div><dt>Market value</dt><dd id="cMarket"></dd></div>
+        <div><dt>For sale</dt><dd id="cForSale"></dd></div>
+        <div><dt>Last sold</dt><dd id="cLastSold"></dd></div>
+        <div><dt>Land value</dt><dd id="cLandValue"></dd></div>
+        <div><dt>Building area</dt><dd id="cBuildingArea"></dd></div>
+        <div><dt>Year built</dt><dd id="cYearBuilt"></dd></div>
+        <div><dt>Lot size</dt><dd id="cSize"></dd></div>
+        <div><dt>Use code</dt><dd id="cUseCode"></dd></div>
+        <div class="wide"><dt>Legal description</dt><dd id="cLegal"></dd></div>
+      </dl>
+    </div>
+
+    <div class="detail-section lead-editor">
+      <h3>Your owner/contact research</h3>
+      <div class="form-grid">
+        <label><span>Email</span><input id="commercialLeadEmail" type="email" placeholder="Enter email manually" /></label>
+        <label><span>For sale</span><select id="commercialForSale"><option value="Unknown" selected>Unknown</option><option value="No">No</option><option value="Yes">Yes</option></select></label>
+        <label><span>Contact status</span>
+          <select id="commercialLeadStatus">
+            <option value="Not researched">Not researched</option><option value="Ready to contact">Ready to contact</option><option value="Called">Called</option><option value="Texted">Texted</option><option value="Emailed">Emailed</option><option value="Spoke with owner">Spoke with owner</option><option value="Follow up">Follow up</option><option value="Not interested">Not interested</option><option value="Bad contact info">Bad contact info</option>
+          </select>
+        </label>
+        <label><span>Priority</span><select id="commercialLeadPriority"><option value="Normal">Normal</option><option value="High">High</option><option value="Hot">Hot</option><option value="Low">Low</option></select></label>
+        <label class="wide"><span>Notes</span><textarea id="commercialLeadNotes" rows="5" placeholder="Owner research, conversation notes, follow-up date, etc."></textarea></label>
+      </div>
+      <button id="saveCommercialContactBtn" class="btn btn-dark btn-large" type="button">Save Lead Information</button>
+      <span id="commercialSaveConfirmation" class="save-confirmation"></span>
+    </div>
+  </template>
+
+  <template id="vacantCommercialDetailTemplate">
+    <div class="detail-actions">
+      <button id="vcDetailSaveLead" class="btn btn-gold" type="button">Save Lead</button>
+      <button id="vcDetailExcludeOwner" class="btn btn-outline" type="button">Exclude Owner</button>
+      <a id="vcDetailTadLink" class="btn btn-outline" target="_blank" rel="noopener">Open TAD</a>
+      <a id="vcDetailGoogleLink" class="btn btn-outline" target="_blank" rel="noopener">Google Maps</a>
+      <a id="vcListingSearchLink" class="btn btn-outline" target="_blank" rel="noopener">Check Listings</a>
+    </div>
+    <div class="detail-section owner-priority-section"><h3>County record owner</h3><dl class="detail-grid owner-priority-grid"><div class="wide"><dt>Owner</dt><dd><span id="vcOwner"></span><a id="vcFastPeopleSearchBtn" class="owner-search-btn" href="#" target="_blank" rel="noopener noreferrer">Search FastPeopleSearch</a></dd></div><div class="wide"><dt>Mailing address</dt><dd id="vcOwnerAddress"></dd></div></dl></div>
+    <div class="detail-section map-detail-section"><div class="detail-section-heading"><div><h3>Property map</h3><p>Satellite view opens by default.</p></div></div><div id="detailMap"></div></div>
+    <div class="detail-section"><h3>Vacancy & lead signals</h3><dl class="detail-grid"><div><dt>Vacancy signal score (estimate)</dt><dd id="vcVacancyScore"></dd></div><div><dt>Lead quality</dt><dd id="vcLeadQuality"></dd></div><div class="wide"><dt>Why this signal score</dt><dd id="vcVacancyReason"></dd></div><div class="wide"><dt>Source</dt><dd id="vcVacancySource"></dd></div><div class="wide"><dt>Next Best Action</dt><dd id="vcNextAction"></dd></div></dl></div>
+    <div class="detail-section"><h3>Commercial property</h3><dl class="detail-grid"><div><dt>Parcel / Account</dt><dd id="vcAccount"></dd></div><div><dt>Property type</dt><dd id="vcPropertyType"></dd></div><div><dt>Market value</dt><dd id="vcMarket"></dd></div><div><dt>Last sold</dt><dd id="vcLastSold"></dd></div><div><dt>Years owned</dt><dd id="vcYearsOwned"></dd></div><div><dt>Building area</dt><dd id="vcBuildingArea"></dd></div><div><dt>Lot size</dt><dd id="vcLotSizeDetail"></dd></div><div><dt>Year built</dt><dd id="vcYearBuilt"></dd></div><div><dt>Use / zoning</dt><dd id="vcUseCode"></dd></div><div><dt>For sale</dt><dd id="vcForSaleDisplay"></dd></div><div class="wide"><dt>Legal description</dt><dd id="vcLegal"></dd></div></dl></div>
+    <div class="detail-section lead-editor"><h3>Your owner/contact research</h3><div class="form-grid"><label><span>Email</span><input id="vcLeadEmail" type="email" placeholder="Enter email manually" /></label><label><span>For sale</span><select id="vcForSale"><option value="Unknown" selected>Unknown</option><option value="No">No</option><option value="Yes">Yes</option></select></label><label><span>Contact status</span><select id="vcLeadStatus"><option value="Not researched">Not researched</option><option value="Ready to contact">Ready to contact</option><option value="Called">Called</option><option value="Texted">Texted</option><option value="Emailed">Emailed</option><option value="Spoke with owner">Spoke with owner</option><option value="Follow up">Follow up</option><option value="Not interested">Not interested</option><option value="Bad contact info">Bad contact info</option></select></label><label><span>Priority</span><select id="vcLeadPriority"><option value="Normal">Normal</option><option value="High">High</option><option value="Hot">Hot</option><option value="Low">Low</option></select></label><label class="wide"><span>Notes</span><textarea id="vcLeadNotes" rows="5" placeholder="Owner research, conversation notes, follow-up details, etc."></textarea></label></div><button id="saveVcContactBtn" class="btn btn-dark btn-large" type="button">Save Lead Information</button><span id="vcSaveConfirmation" class="save-confirmation"></span></div>
+  </template>
+
+  <template id="propertyDetailTemplate">
+    <div class="detail-actions"><button id="propertyDetailSaveLead" class="btn btn-gold" type="button">Save Lead</button><a id="propertyDetailTadLink" class="btn btn-outline" target="_blank" rel="noopener">Open TAD</a><a id="propertyDetailGoogleLink" class="btn btn-outline" target="_blank" rel="noopener">Google Maps</a><a id="propertyListingSearchLink" class="btn btn-outline" target="_blank" rel="noopener">Check Listings</a></div>
+    <div class="detail-section owner-priority-section"><h3>County record owner</h3><dl class="detail-grid owner-priority-grid"><div class="wide"><dt>Owner</dt><dd><span id="pOwner"></span><a id="propertyFastPeopleSearchBtn" class="owner-search-btn" href="#" target="_blank" rel="noopener noreferrer">Search FastPeopleSearch</a></dd></div><div class="wide"><dt>Mailing address</dt><dd id="pOwnerAddress"></dd></div></dl></div>
+    <div class="detail-section map-detail-section"><div class="detail-section-heading"><div><h3>Property map</h3><p>Satellite view opens by default.</p></div></div><div id="detailMap"></div></div>
+    <div class="detail-section"><h3>Lead assessment</h3><dl class="detail-grid"><div><dt>Lead Quality Score</dt><dd id="pLeadQuality"></dd></div><div><dt>For sale</dt><dd id="pForSaleDisplay"></dd></div><div class="wide"><dt>Why this score</dt><dd id="pQualityReason"></dd></div><div class="wide"><dt>Next Best Action</dt><dd id="pNextAction"></dd></div></dl></div>
+    <div class="detail-section"><h3>Property</h3><dl class="detail-grid"><div><dt>Parcel / Account</dt><dd id="pAccount"></dd></div><div><dt>Property type / use</dt><dd id="pType"></dd></div><div><dt>Market / appraised value</dt><dd id="pMarket"></dd></div><div><dt>Last sale / deed date</dt><dd id="pLastSold"></dd></div><div><dt>Estimated years owned</dt><dd id="pYearsOwned"></dd></div><div><dt>Lot size</dt><dd id="pLotSize"></dd></div><div><dt>Building size</dt><dd id="pBuildingSize"></dd></div><div><dt>Year built</dt><dd id="pYearBuilt"></dd></div><div><dt>Use / zoning</dt><dd id="pUseCode"></dd></div><div><dt>Likely owner occupied</dt><dd id="pOwnerOccupied"></dd></div><div class="wide"><dt>Legal description</dt><dd id="pLegal"></dd></div></dl></div>
+    <div class="detail-section lead-editor"><h3>Your owner/contact research</h3><div class="form-grid"><label><span>Email</span><input id="propertyLeadEmail" type="email" placeholder="Enter email manually" /></label><label><span>For sale</span><select id="propertyForSale"><option value="Unknown" selected>Unknown</option><option value="No">No</option><option value="Yes">Yes</option></select></label><label><span>Contact status</span><select id="propertyLeadStatus"><option value="Not researched">Not researched</option><option value="Ready to contact">Ready to contact</option><option value="Called">Called</option><option value="Texted">Texted</option><option value="Emailed">Emailed</option><option value="Spoke with owner">Spoke with owner</option><option value="Follow up">Follow up</option><option value="Not interested">Not interested</option><option value="Bad contact info">Bad contact info</option></select></label><label><span>Priority</span><select id="propertyLeadPriority"><option value="Normal">Normal</option><option value="High">High</option><option value="Hot">Hot</option><option value="Low">Low</option></select></label><label class="wide"><span>Notes</span><textarea id="propertyLeadNotes" rows="5"></textarea></label></div><button id="savePropertyContactBtn" class="btn btn-dark btn-large" type="button">Save Lead Information</button><span id="propertySaveConfirmation" class="save-confirmation"></span></div>
+  </template>
+
+  <template id="ownerDetailTemplate">
+    <div class="detail-actions">
+      <button id="ownerDetailSaveLead" class="btn btn-gold" type="button">Save Lead</button>
+      <a id="ownerDetailTadLink" class="btn btn-outline" target="_blank" rel="noopener">Open TAD</a>
+      <a id="ownerDetailGoogleLink" class="btn btn-outline" target="_blank" rel="noopener">Google Maps</a>
+    </div>
+
+    <div class="detail-section owner-priority-section">
+      <h3>County record owner</h3>
+      <dl class="detail-grid owner-priority-grid">
+        <div class="wide"><dt>Owner</dt><dd><span id="oOwner"></span><a id="ownerFastPeopleSearchBtn" class="owner-search-btn" href="#" target="_blank" rel="noopener noreferrer">Search FastPeopleSearch</a></dd></div>
+        <div class="wide"><dt>Mailing address</dt><dd id="oOwnerAddress"></dd></div>
+      </dl>
+    </div>
+
+    <div class="detail-section map-detail-section">
+      <div class="detail-section-heading"><div><h3>Property map</h3><p>Satellite view opens by default.</p></div></div>
+      <div id="detailMap"></div>
+    </div>
+
+    <div class="detail-section">
+      <h3>Ownership</h3>
+      <dl class="detail-grid">
+        <div><dt>Years owned</dt><dd id="oYearsOwned"></dd></div>
+        <div><dt>Deed date</dt><dd id="oDeedDate"></dd></div>
+        <div><dt>Likely owner occupied</dt><dd id="oOwnerOccupied"></dd></div>
+        <div><dt>Parcel / Account</dt><dd id="oAccount"></dd></div>
+      </dl>
+    </div>
+
+    <div class="detail-section">
+      <h3>Property</h3>
+      <dl class="detail-grid">
+        <div><dt>Market value</dt><dd id="oMarket"></dd></div>
+        <div><dt>Living area</dt><dd id="oLivingArea"></dd></div>
+        <div><dt>Year built</dt><dd id="oYearBuilt"></dd></div>
+        <div><dt>Use code</dt><dd id="oUseCode"></dd></div>
+        <div><dt>Lot size</dt><dd id="oSize"></dd></div>
+        <div class="wide"><dt>Legal description</dt><dd id="oLegal"></dd></div>
+      </dl>
+    </div>
+
+    <div class="detail-section lead-editor">
+      <h3>Your owner/contact research</h3>
+      <div class="form-grid">
+        <label><span>Email</span><input id="ownerLeadEmail" type="email" placeholder="Enter email manually" /></label>
+        <label><span>Contact status</span>
+          <select id="ownerLeadStatus">
+            <option value="Not researched">Not researched</option><option value="Ready to contact">Ready to contact</option><option value="Called">Called</option><option value="Texted">Texted</option><option value="Emailed">Emailed</option><option value="Spoke with owner">Spoke with owner</option><option value="Follow up">Follow up</option><option value="Not interested">Not interested</option><option value="Bad contact info">Bad contact info</option>
+          </select>
+        </label>
+        <label><span>Priority</span><select id="ownerLeadPriority"><option value="Normal">Normal</option><option value="High">High</option><option value="Hot">Hot</option><option value="Low">Low</option></select></label>
+        <label class="wide"><span>Notes</span><textarea id="ownerLeadNotes" rows="5" placeholder="Owner research, conversation notes, follow-up date, etc."></textarea></label>
+      </div>
+      <button id="saveOwnerContactBtn" class="btn btn-dark btn-large" type="button">Save Lead Information</button>
+      <span id="ownerSaveConfirmation" class="save-confirmation"></span>
+    </div>
+  </template>
+
+  <dialog id="leadforgeSettingsDialog" class="settings-dialog" aria-labelledby="settingsTitle">
+    <form method="dialog">
+      <div class="settings-header"><div><p class="eyebrow">PERSONAL PREFERENCES</p><h2 id="settingsTitle">Outreach Signature</h2></div><button class="icon-btn" value="cancel" aria-label="Close settings">×</button></div>
+      <p>Your signature stays in this browser. The public codebase contains no personal contact information.</p>
+      <label for="leadforgeSignatureInput"><span>Signature for optional outreach drafts</span></label>
+      <textarea id="leadforgeSignatureInput" rows="5" placeholder="Your name · Brokerage · Contact details (optional)"></textarea>
+      <div class="settings-actions"><button class="btn btn-outline" value="cancel">Cancel</button><button id="leadforgeSaveSignature" class="btn btn-gold" type="button">Save Signature</button></div>
+    </form>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="storage-utils.js"></script>
+  <script src="brand-ui.js"></script>
+  <script src="reddit-engine.js"></script>
+  <script src="app.js"></script>
+  <script src="community-hub.js"></script>
+</body>
+</html>
